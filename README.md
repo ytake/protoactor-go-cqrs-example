@@ -51,7 +51,7 @@ graph TD;
 
 ```bash
 $ docker-compose up -d
-$ go run cmd/server/main.go
+$ go run cmd/main.go
 ```
 
 ## Post a command / create user

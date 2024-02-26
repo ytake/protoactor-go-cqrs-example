@@ -7,12 +7,6 @@ Tactical DDD layers are not implemented.
 - use actor model to easily implement ES+CQRS(protoactor-go)
 - use [sqlc](https://github.com/sqlc-dev/sqlc) to generate code from sql.
 
-戦術的DDDのパターンを使わずにアクターモデルを使ってCQRSパターンを実装したサンプル  
-english
-
-no tactical DDD pattern, implemented CQRS pattern using actor model 
-
-
 このリポジトリは、protoactor-goを使ってCQRSパターンを実装したサンプルです(アクターモデル)。  
 簡単なユーザー登録とユーザー一覧取得を実装しています。  
 戦術的DDDのパターンでは実装していません。

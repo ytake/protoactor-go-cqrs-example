@@ -1,0 +1,19 @@
+services:
+  db:
+    image: mysql:8.0
+    volumes:
+      - mysql-store:/var/lib/mysql
+      - ./docker/mysql/logs:/var/log/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./docker/mysql/initdb.d:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_DATABASE=sample
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=passw@rd
+      - MYSQL_ROOT_PASSWORD=passw@rd
+      - TZ=Asia/Tokyo
+    ports:
+      - 3306:3306
+
+volumes:
+  mysql-store:

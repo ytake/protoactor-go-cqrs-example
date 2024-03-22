@@ -8,4 +8,5 @@ message UserCreated {
   string userName = 1;
   string email = 2;
   string userID = 3;
+  int64 version = 4;
 }

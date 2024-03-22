@@ -74,6 +74,10 @@ func (u *User) IsStateExists(email string) bool {
 
 // createUser is a method to create user
 func (u *User) createUser(context actor.Context, msg *event.UserCreated) {
+	// バージョンを利用して楽観的ロックを実現することができます
+	// この例では、バージョンをインクリメントして永続化し、Read Model更新アクターに送信します
+	// 実際に実装する場合は、HTTPリクエストにversionを含めて送信するなどで、永続化されたデータとの競合を防ぐことができます
+	msg.Version++
 	u.persist(msg)
 	u.sendToReadModelUpdater(context, msg)
 }
@@ -115,6 +119,9 @@ func (u *CreateUser) Handle(ctx actor.Context, msg *command.CreateUser) {
 				return u.rmu
 			})
 		}, actor.WithReceiverMiddleware(persistence.Using(u.provider))), "user-"+msg.Email)
+	// 登録ユーザーのメールアドレスが既に存在する場合はエラーを返す
+	// メッセージ送信時に現在のバージョンを送信することで、永続化されたデータとの競合を防ぐことができます
+	// 詳しくはprotobufを参照してください
 	if errors.Is(err, actor.ErrNameExists) {
 		ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("user %s already exists", msg.Email)})
 		return
@@ -123,5 +130,6 @@ func (u *CreateUser) Handle(ctx actor.Context, msg *command.CreateUser) {
 		ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("failed error %s", err.Error())})
 		return
 	}
+
 	ctx.Send(ref, msg)
 }

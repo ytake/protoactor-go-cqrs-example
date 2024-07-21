@@ -1,7 +1,6 @@
 package registration
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/asynkron/protoactor-go/actor"
@@ -18,10 +17,10 @@ type User struct {
 	persistence.Mixin
 	stream *actor.PID
 	state  *event.UserCreated
-	rmu    actor.Producer
+	rmu    *actor.PID
 }
 
-func NewUser(stream *actor.PID, rmu actor.Producer) actor.Actor {
+func NewUser(stream *actor.PID, rmu *actor.PID) actor.Actor {
 	return &User{
 		stream: stream,
 		rmu:    rmu,
@@ -83,8 +82,7 @@ func (u *User) createUser(context actor.Context, msg *event.UserCreated) {
 }
 
 func (u *User) sendToReadModelUpdater(context actor.Context, ev *event.UserCreated) {
-	write := context.Spawn(actor.PropsFromProducer(u.rmu))
-	context.RequestWithCustomSender(write, ev, context.Self())
+	context.RequestWithCustomSender(u.rmu, ev, context.Self())
 }
 
 func (u *User) persist(msg proto.Message) {
@@ -95,41 +93,4 @@ func (u *User) persist(msg proto.Message) {
 	case *event.UserCreated:
 		u.state = ev
 	}
-}
-
-// CreateUser is a command to create user
-type CreateUser struct {
-	rmu      actor.Actor
-	provider persistence.Provider
-}
-
-// NewCreateUser is a constructor for CreateUser
-func NewCreateUser(rmu actor.Actor, provider persistence.Provider) *CreateUser {
-	return &CreateUser{
-		rmu:      rmu,
-		provider: provider,
-	}
-}
-
-// Handle is a method to handle CreateUser command
-func (u *CreateUser) Handle(ctx actor.Context, msg *command.CreateUser) {
-	ref, err := ctx.SpawnNamed(
-		actor.PropsFromProducer(func() actor.Actor {
-			return NewUser(msg.Stream, func() actor.Actor {
-				return u.rmu
-			})
-		}, actor.WithReceiverMiddleware(persistence.Using(u.provider))), "user-"+msg.Email)
-	// 登録ユーザーのメールアドレスが既に存在する場合はエラーを返す
-	// メッセージ送信時に現在のバージョンを送信することで、永続化されたデータとの競合を防ぐことができます
-	// 詳しくはprotobufを参照してください
-	if errors.Is(err, actor.ErrNameExists) {
-		ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("user %s already exists", msg.Email)})
-		return
-	}
-	if err != nil {
-		ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("failed error %s", err.Error())})
-		return
-	}
-
-	ctx.Send(ref, msg)
 }

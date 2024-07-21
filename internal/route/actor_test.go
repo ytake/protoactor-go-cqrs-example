@@ -13,7 +13,6 @@ import (
 	"github.com/ytake/protoactor-go-cqrs-example/internal/command"
 	"github.com/ytake/protoactor-go-cqrs-example/internal/database/mysql"
 	"github.com/ytake/protoactor-go-cqrs-example/internal/message"
-	"github.com/ytake/protoactor-go-cqrs-example/internal/registration"
 	"github.com/ytake/protoactor-go-cqrs-example/pkg/event"
 )
 
@@ -79,14 +78,13 @@ func TestRestAPI_Receive(t *testing.T) {
 	}{
 		{
 			name:  "success",
-			actor: NewRestAPI(registration.NewCreateUser(registration.NewUserModelUpdate(&Success{}), NewProvider(3))),
+			actor: NewRestAPI(&Success{}, NewProvider(3)),
 			want:  true,
 		},
 		{
 			name: "fail",
 			actor: NewRestAPI(
-				registration.NewCreateUser(
-					registration.NewUserModelUpdate(&Fail{}), NewProvider(3).InitState("rest-api/user-test2@example.com", 4, 3))),
+				&Fail{}, NewProvider(3).InitState("rest-api/user-test2@example.com", 3, 3)),
 			want: false,
 		},
 	}

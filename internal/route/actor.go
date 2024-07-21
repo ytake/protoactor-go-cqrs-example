@@ -2,26 +2,27 @@ package route
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/persistence"
 	"github.com/ytake/protoactor-go-cqrs-example/internal/command"
 	"github.com/ytake/protoactor-go-cqrs-example/internal/database/mysql"
+	"github.com/ytake/protoactor-go-cqrs-example/internal/message"
 	"github.com/ytake/protoactor-go-cqrs-example/internal/registration"
 	persistencemysql "github.com/ytake/protoactor-go-persistence-mysql"
 )
 
 type (
-	// CreateUserMessageHandler is a interface to handle CreateUser message
-	CreateUserMessageHandler interface {
-		// Handle is a method to handle CreateUser message
-		Handle(ctx actor.Context, msg *command.CreateUser)
-	}
 	Actor struct {
 		system *actor.ActorSystem
 		pid    *actor.PID
 	}
 	RestAPI struct {
-		createUserMessageHandler CreateUserMessageHandler
+		db       mysql.RegistrationUserExecutor
+		provider persistence.Provider
+		rmu      *actor.PID
 	}
 )
 
@@ -36,9 +37,10 @@ func (a *Actor) PID() *actor.PID {
 }
 
 // NewRestAPI is a constructor for RestAPI
-func NewRestAPI(createUserMessageHandler CreateUserMessageHandler) actor.Actor {
+func NewRestAPI(db mysql.RegistrationUserExecutor, provider persistence.Provider) actor.Actor {
 	return &RestAPI{
-		createUserMessageHandler: createUserMessageHandler,
+		db:       db,
+		provider: provider,
 	}
 }
 
@@ -50,8 +52,7 @@ func NewRestAPIActorSystem(db *sql.DB) (*Actor, error) {
 		return nil, err
 	}
 	root, err := system.Root.SpawnNamed(actor.PropsFromProducer(func() actor.Actor {
-		return NewRestAPI(
-			registration.NewCreateUser(registration.NewUserModelUpdate(mysql.NewUserStore(db)), provider))
+		return NewRestAPI(mysql.NewUserStore(db), provider)
 	}), "rest-api")
 	if err != nil {
 		return nil, err
@@ -64,7 +65,26 @@ func NewRestAPIActorSystem(db *sql.DB) (*Actor, error) {
 
 func (a *RestAPI) Receive(ctx actor.Context) {
 	switch msg := ctx.Message().(type) {
+	case *actor.Started:
+		a.rmu = ctx.Spawn(actor.PropsFromProducer(func() actor.Actor {
+			return registration.NewUserModelUpdate(a.db)
+		}))
 	case *command.CreateUser:
-		a.createUserMessageHandler.Handle(ctx, msg)
+		ref, err := ctx.SpawnNamed(
+			actor.PropsFromProducer(func() actor.Actor {
+				return registration.NewUser(msg.Stream, a.rmu)
+			}, actor.WithReceiverMiddleware(persistence.Using(a.provider))), "user-"+msg.Email)
+		// 登録ユーザーのメールアドレスが既に存在する場合はエラーを返す
+		// メッセージ送信時に現在のバージョンを送信することで、永続化されたデータとの競合を防ぐことができます
+		// 詳しくはprotobufを参照してください
+		if errors.Is(err, actor.ErrNameExists) {
+			ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("user %s already exists", msg.Email)})
+			return
+		}
+		if err != nil {
+			ctx.Send(msg.Stream, &message.UserCreateError{Message: fmt.Sprintf("failed error %s", err.Error())})
+			return
+		}
+		ctx.Send(ref, msg)
 	}
 }

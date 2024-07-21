@@ -5,6 +5,7 @@ go 1.22.0
 require (
 	github.com/Workiva/go-datastructures v1.1.1 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
+	github.com/asynkron/goconsole v0.0.0-20160504192649-bfa12eebf716 // indirect
 	github.com/asynkron/gofun v0.0.0-20220329210725-34fed760f4c2 // indirect
 	github.com/asynkron/protoactor-go v0.0.0-20240204165126-fb0ab3e1e075 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
